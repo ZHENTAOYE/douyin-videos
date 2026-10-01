@@ -4,6 +4,8 @@
 #   src/fetch_assets.sh
 #   src/build.sh
 set -euo pipefail
+NARR=()
+for f in ${NARRATION:-}; do NARR+=("$(realpath "$f")"); done   # resolve before cd
 cd "$(dirname "$0")"
 ROOT=$(cd .. && pwd)
 export KOKORO_DIR=${KOKORO_DIR:-$ROOT/assets/models/kokoro-multi-lang-v1_1}
@@ -11,7 +13,13 @@ export SENSEVOICE_DIR=${SENSEVOICE_DIR:-$ROOT/assets/models/sherpa-onnx-sense-vo
 export FONT_DIR=${FONT_DIR:-$ROOT/assets/fonts}
 mkdir -p "$ROOT/build" "$ROOT/output"
 
-python3 tts.py --qa            # narration, ASR-checked line by line
+# narration: built-in TTS by default, or external audio (e.g. 冬瓜配音 export):
+#   NARRATION="/path/旁白.mp3" src/build.sh      (several files: space-separated, in order)
+if [ ${#NARR[@]} -gt 0 ]; then
+  python3 import_voice.py "${NARR[@]}"
+else
+  python3 tts.py --qa            # ASR-checked line by line
+fi
 python3 timeline.py            # master timeline + voice track
 (cd render && node main.js --cues-only)
 python3 music.py               # original score + sound effects

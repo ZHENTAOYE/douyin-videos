@@ -8,7 +8,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 from script import SEGMENTS, plain, say_text
-from kokoro_tts import synth, write_wav
+from kokoro_tts import write_wav
 
 VOICE = 62        # Kokoro v1.1-zh 男声，实测吐字最清楚、语调起伏最大
 SPEED = 1.12
@@ -71,7 +71,29 @@ def chunk(text, maxlen=15):
     return final
 
 
+def line_item(sid, scene, text, pause, sr, x):
+    """Metadata for one narration line: duration + subtitle-chunk timings.
+    Chunks are timed by character count, then snapped to the real pauses in the audio."""
+    dur = len(x) / sr
+    chunks = chunk(text)
+    gaps = pauses(sr, x)
+    weights = [len(re.sub(r"[，。：；？！、“”《》·【】\s]", "", c)) + 0.6 for c in chunks]
+    cum = np.cumsum(weights) / sum(weights) * dur
+    bounds = [0.0]
+    for b in cum[:-1]:
+        best = min(gaps, key=lambda g: abs((g[0] + g[1]) / 2 - b), default=None)
+        if best and abs((best[0] + best[1]) / 2 - b) < 0.9:
+            b = (best[0] + best[1]) / 2
+        bounds.append(float(b))
+    bounds.append(dur)
+    bounds = sorted(bounds)
+    return dict(id=sid, scene=scene, text=text, pause=pause, dur=round(dur, 3),
+                chunks=[dict(text=c, t0=round(bounds[i], 3), t1=round(bounds[i + 1], 3))
+                        for i, c in enumerate(chunks)])
+
+
 def main():
+    from kokoro_tts import synth
     os.makedirs(f"{BUILD}/voice", exist_ok=True)
     qa = "--qa" in sys.argv
     if qa:
@@ -97,23 +119,8 @@ def main():
                 break
         score, heard, speed, sr, x = best
         write_wav(path, sr, x)
-        dur = len(x) / sr
-        chunks = chunk(text)
-        gaps = pauses(sr, x)
-        # time each chunk: proportional to characters, then snap to nearest real pause
-        weights = [len(re.sub(r"[，。：；？！、“”《》·【】\s]", "", c)) + 0.6 for c in chunks]
-        cum = np.cumsum(weights) / sum(weights) * dur
-        bounds = [0.0]
-        for b in cum[:-1]:
-            best = min(gaps, key=lambda g: abs((g[0] + g[1]) / 2 - b), default=None)
-            if best and abs((best[0] + best[1]) / 2 - b) < 0.9:
-                b = (best[0] + best[1]) / 2
-            bounds.append(float(b))
-        bounds.append(dur)
-        bounds = sorted(bounds)
-        item = dict(id=sid, scene=scene, text=text, pause=pause, dur=round(dur, 3),
-                    chunks=[dict(text=c, t0=round(bounds[i], 3), t1=round(bounds[i + 1], 3))
-                            for i, c in enumerate(chunks)])
+        item = line_item(sid, scene, text, pause, sr, x)
+        dur = item["dur"]
         item["speed"] = speed
         if qa:
             item["asr"] = heard
