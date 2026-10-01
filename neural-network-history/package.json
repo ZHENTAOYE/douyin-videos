@@ -1,0 +1,13 @@
+{
+  "name": "neural-network-history",
+  "private": true,
+  "description": "《神经网络往事》抖音科普短片 —— 逐帧渲染器",
+  "scripts": {
+    "still": "cd src/render && node main.js --still",
+    "check": "cd src/render && node main.js --check",
+    "build": "src/build.sh"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.9"
+  }
+}

@@ -1,0 +1,5 @@
+node_modules
+__pycache__/
+*.pyc
+neural-network-history/build/
+neural-network-history/assets/
