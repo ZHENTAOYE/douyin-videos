@@ -269,3 +269,9 @@ def radial_glow(img, cx, cy, radius, color, intensity, falloff=2.0):
     g *= np.clip(1.2 - d / 6.0, 0, 1)
     img[y0:y1, x0:x1] += g[..., None] * (np.array(color, np.float32) * intensity)
     return img
+
+
+def vsmooth(e0, e1, x):
+    """Vectorised smoothstep for numpy arrays."""
+    t = np.clip((np.asarray(x, np.float32) - e0) / (e1 - e0), 0, 1)
+    return t * t * (3 - 2 * t)
