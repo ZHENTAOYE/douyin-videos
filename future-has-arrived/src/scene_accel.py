@@ -190,7 +190,8 @@ def render_montage(t):
     big = cv2.warpAffine(big, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
     img = big * 0.42
     # quick white flash on each cut
-    flash = math.exp(-max(0.0, t - t_k) * 22.0) * (0.55 if k < len(ms) - 1 else 1.2)
+    # flash only on the slower cuts (fast cuts must not strobe), plus one on the final '2026'
+    flash = math.exp(-max(0.0, t - t_k) * 22.0) * (0.45 * clamp((span - 0.3) / 0.6) if k < len(ms) - 1 else 1.0)
     img = img + flash
     L = Layer()
     c = L.canvas

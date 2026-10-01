@@ -108,7 +108,7 @@ def render_voyager(t):
             p = skia.Paint(AntiAlias=True, StrokeWidth=1.2, Color=skia.Color4f(0.7, 0.85, 1.0, 0.25 * a))
             p.setPathEffect(skia.DashPathEffect.Make([6, 10], 0))
             c.drawLine(d0[0], d0[1], sx0, sy0, p)
-            sig = smoothstep(t0 + 5.3, t0 + 9.6, t)
+            sig = smoothstep(t0 + 5.9, t0 + 9.7, t)
             if 0 < sig < 1:
                 x = lerp(d0[0], sx0, sig)
                 yv = lerp(d0[1], sy0, sig)
@@ -120,14 +120,14 @@ def render_voyager(t):
                                  cards.fnt('num', 'SemiBold', 30), (0.8, 0.92, 1.0), 0.9, align='center', shadow=0.7)
         gfx.over(img, L.rgba())
     # signal-time bar: Voyager 1 -> Earth, ~23.6 h one way
-    a = smoothstep(101.3, 101.9, t) * (1 - smoothstep(105.2, 105.7, t))
+    a = smoothstep(101.9, 102.5, t) * (1 - smoothstep(105.3, 105.8, t))
     if a > 0:
         L = Layer()
         c = L.canvas
         x0, x1, yb = W * 0.56, W * 0.92, H * 0.86
         p = skia.Paint(AntiAlias=True, StrokeWidth=1.4, Color=skia.Color4f(1, 1, 1, 0.35 * a))
         c.drawLine(x0, yb, x1, yb, p)
-        prog = smoothstep(101.6, 105.2, t)
+        prog = smoothstep(102.2, 105.4, t)
         p2 = skia.Paint(AntiAlias=True, StrokeWidth=2.4, Color=skia.Color4f(0.75, 0.9, 1.0, 0.9 * a))
         c.drawLine(x0, yb, lerp(x0, x1, prog), yb, p2)
         gp = skia.Paint(AntiAlias=True, Color=skia.Color4f(0.85, 0.95, 1.0, a))

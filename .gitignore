@@ -1,2 +1,3 @@
-future-has-arrived/output/*.mp4
 __pycache__/
+# chat previews are regenerated; the 1080p master (<95 MB) is kept in git
+future-has-arrived/output/preview*.mp4

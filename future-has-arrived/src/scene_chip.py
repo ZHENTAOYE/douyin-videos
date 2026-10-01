@@ -173,7 +173,7 @@ def render_die_object(t, t0):
 def render(t):
     if t < 8.55:
         img = render_city(t)
-        fade_in = smoothstep(0.0, 0.9, t)
+        fade_in = smoothstep(0.0, 0.35, t)
         img *= fade_in
         zb = smoothstep(7.2, 8.55, t) * 0.55
         img = zoom_blur(img, zb)

@@ -213,42 +213,66 @@ def render_source(t):
     return img * a
 
 
-# ------------------------------------------------------------------ mirror surface glide (GL)
+# ------------------------------------------------------------------ the collector mirror (ray traced)
 MIRROR_FS = """
 #version 330
 in vec2 uv; out vec4 o;
-uniform vec2 res; uniform float time; uniform vec3 eye; uniform vec3 fwd; uniform vec3 src;
+uniform vec2 res; uniform vec3 eye; uniform vec3 tgt; uniform float time; uniform float glow;
+// concave spherical cap: sphere centre C, radius R, cap facing +z (towards the focus), aperture radius A
+const float R = 1.6; const float A = 0.95; const float HOLE = 0.12;
+const vec3 C = vec3(0.0, 0.0, 1.6);
+vec3 F = vec3(0.0, 0.0, 0.8);            // focus (plasma) at R/2 in front of the vertex
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
-float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
-  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
-vec3 skyc(vec3 d){
-  float y = d.y;
-  vec3 c = mix(vec3(0.05,0.035,0.10), vec3(0.008,0.006,0.02), smoothstep(0.0,0.5,y));
-  vec3 s = normalize(src - eye);
-  float k = max(dot(d, s), 0.0);
-  c += vec3(0.75,0.55,1.0) * (pow(k, 4000.0)*16.0 + pow(k, 400.0)*1.2 + pow(k, 40.0)*0.12 + pow(k,4.0)*0.05);
+vec3 env(vec3 d){
+  // clean room: a ceiling grid of light panels, soft walls, dark floor, two softboxes
+  vec3 c = mix(vec3(0.010, 0.010, 0.016), vec3(0.05, 0.055, 0.075), smoothstep(-0.3, 0.3, d.y));
+  if(d.y > 0.05){
+    vec2 g = d.xz / d.y * 1.4 + vec2(0.0, 0.3);
+    vec2 f = abs(fract(g) - 0.5);
+    float panel = smoothstep(0.30, 0.27, max(f.x, f.y*0.8));
+    c += vec3(0.95, 0.97, 1.0) * panel * 0.9 * smoothstep(0.05, 0.35, d.y);
+  }
+  c += vec3(1.0, 0.96, 0.92) * smoothstep(0.975, 0.99, dot(d, normalize(vec3(-0.7, 0.35, 0.6)))) * 2.0;
+  c += vec3(0.85, 0.9, 1.0) * smoothstep(0.980, 0.993, dot(d, normalize(vec3(0.8, 0.25, 0.55)))) * 1.6;
   return c;
+}
+vec3 film(float x){ return 0.55 + 0.45*cos(6.2831*(vec3(0.0, 0.33, 0.67) + x)); }
+float plasma_hit(vec3 ro, vec3 rd){
+  vec3 oc = F - ro; float t = max(dot(oc, rd), 0.0); float d = length(oc - rd*t);
+  return exp(-d*d/0.0008)*3.0 + exp(-d*d/0.02)*0.25;
 }
 void main(){
   vec2 q = (uv - 0.5) * vec2(res.x/res.y, 1.0);
-  vec3 f = normalize(fwd), r = normalize(cross(f, vec3(0,1,0))), u = cross(r, f);
-  vec3 d = normalize(f + q.x*r*0.9 + q.y*u*0.9);
-  vec3 col;
-  if(d.y < 0.0){
-    float tt = -eye.y / d.y;
-    vec3 p = eye + d*tt;
-    // microscopically perfect: only the faintest polishing ripples
-    float n = vnoise(p.xz*0.8) * 0.0008 + vnoise(p.xz*7.0)*0.0002;
-    vec3 nrm = normalize(vec3(n, 1.0, n*0.7));
-    vec3 rd = reflect(d, nrm);
-    float fres = 0.62 + 0.38*pow(1.0 - max(dot(-d, nrm),0.0), 5.0);
-    // multilayer coating tint varies gently with angle
-    vec3 tint = 0.6 + 0.4*cos(6.2831*(vec3(0.0,0.33,0.67) + rd.y*1.5 + 0.15));
-    col = skyc(rd) * fres * mix(vec3(1.0), tint, 0.35);
-    col *= exp(-tt*0.004);
-    col += vec3(0.04,0.03,0.07) * (1.0 - exp(-tt*0.01));
-  } else {
-    col = skyc(d);
+  vec3 f = normalize(tgt - eye), r = normalize(cross(f, vec3(0,1,0))), u = cross(r, f);
+  vec3 rd = normalize(f + q.x*r*0.80 + q.y*u*0.80);
+  vec3 ro = eye;
+  vec3 col = env(rd) + vec3(0.65, 0.45, 1.0) * plasma_hit(ro, rd) * glow;
+  // ray-sphere (inside surface of the cap)
+  vec3 oc = ro - C; float b = dot(oc, rd); float c = dot(oc, oc) - R*R; float h = b*b - c;
+  if(h > 0.0){
+    float sh = sqrt(h);
+    for(int k=0;k<2;k++){
+      float t = (k==0) ? (-b - sh) : (-b + sh);
+      if(t <= 0.0) continue;
+      vec3 p = ro + rd*t;
+      float rad = length(p.xy);
+      if(p.z > C.z || rad > A) continue;
+      vec3 n = normalize(C - p);                 // concave side faces the focus
+      if(rad < HOLE){ break; }
+      vec3 rr = reflect(rd, n);
+      float mu = abs(dot(rd, n));
+      // multilayer coating: angle-dependent interference colour, slight radial variation
+      vec3 tint = film(mu*0.9 + rad*0.35 + 0.1);
+      vec3 refl = env(rr) + vec3(0.65, 0.45, 1.0) * plasma_hit(p, rr) * glow * 1.4;
+      // the reflected plasma converges toward the second focus: a bright violet sheen across the dish
+      float sheen = pow(max(dot(rr, normalize(F - p)), 0.0), 40.0);
+      col = refl * mix(vec3(1.0), tint, 0.65) * 0.95 + tint * 0.035 + vec3(0.6, 0.4, 1.0) * sheen * 0.25 * glow;
+      // fine polishing structure is invisible: keep it perfectly smooth; add subtle edge darkening
+      col *= smoothstep(A, A - 0.03, rad) * 0.9 + 0.1;
+      // rim: machined metal ring
+      if(rad > A - 0.025) col = vec3(0.35, 0.34, 0.33) * (0.4 + 0.6*max(dot(n, normalize(vec3(-0.6,0.7,0.4))), 0.0));
+      break;
+    }
   }
   o = vec4(col, 1.0);
 }
@@ -258,22 +282,23 @@ _fs = {}
 
 def render_mirror(t, t0):
     if 'm' not in _fs:
-        _fs['m'] = gl3d.FullScreen('mirror', MIRROR_FS)
+        _fs['m'] = gl3d.FullScreen('collector', MIRROR_FS)
     lt = t - t0
-    eye = (0.0 + lt * 9.0, 1.2 + 0.4 * lt, 0.0)
-    fwd = (1.0, -0.10 - 0.012 * lt, 0.18)
-    src = (eye[0] + 420.0, 70.0, 110.0)
+    ang = math.radians(-26 + 4.0 * lt)
+    dist = 2.75 - 0.25 * ease_out(clamp(lt / 7.0))
+    eye = (dist * math.sin(ang), 0.42 - 0.02 * lt, 0.15 + dist * math.cos(ang))
+    tgt = (0.12, 0.02, 0.15)
     tg = gl3d.target(samples=0)
     tg.begin((0, 0, 0, 1))
-    _fs['m'].render(time=t, eye=eye, fwd=fwd, src=src)
+    g = 0.8 + 0.2 * math.sin(lt * 9.0) ** 2
+    _fs['m'].render(eye=eye, tgt=tgt, time=t, glow=g)
     img = tg.read()[..., :3].copy()
     # a flat surface-profile trace with a scale bar, drawn like a lab instrument readout
     L = Layer()
     c = L.canvas
     a = smoothstep(t0 + 0.8, t0 + 1.6, t) * (1 - smoothstep(61.0, 61.8, t))
-    y0 = H * 0.36
-    x0, x1 = W * 0.52, W * 0.93
-    p = skia.Paint(AntiAlias=True, StrokeWidth=2.0, Color=skia.Color4f(1, 1, 1, 0.85 * a))
+    y0 = H * 0.22
+    x0, x1 = W * 0.56, W * 0.93
     path = skia.Path()
     rng = np.random.default_rng(4)
     ys = np.convolve(rng.normal(0, 1, 260), np.ones(9) / 9, 'same') * 0.9
@@ -283,12 +308,12 @@ def render_mirror(t, t0):
     c.drawPath(path, skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style, StrokeWidth=2.0,
                                 Color=skia.Color4f(1.0, 0.9, 1.0, 0.85 * a)))
     tick = skia.Paint(AntiAlias=True, StrokeWidth=1.2, Color=skia.Color4f(1, 1, 1, 0.5 * a))
-    c.drawLine(x0, y0 - 46, x0, y0 + 46, tick)
-    c.drawLine(x1, y0 - 46, x1, y0 + 46, tick)
-    cards.draw_mixed(c, '表面起伏（按“德国大小”等比放大）', x0, y0 - 64, cards.fnt('sans', 'Regular', 30), cards.fnt('num', 'Regular', 32),
-                     (0.9, 0.9, 0.95), a * 0.85)
-    cards.draw_mixed(c, '≤ 0.1 mm', x1, y0 + 84, cards.fnt('sans', 'Medium', 30), cards.fnt('num', 'SemiBold', 42),
-                     (1.0, 0.8, 1.0), a, align='right')
+    c.drawLine(x0, y0 - 40, x0, y0 + 40, tick)
+    c.drawLine(x1, y0 - 40, x1, y0 + 40, tick)
+    cards.draw_mixed(c, '表面起伏（按“德国大小”等比放大）', x0, y0 - 58, cards.fnt('sans', 'Regular', 28), cards.fnt('num', 'Regular', 30),
+                     (0.9, 0.9, 0.95), a * 0.85, shadow=0.6)
+    cards.draw_mixed(c, '≤ 0.1 mm', x1, y0 + 78, cards.fnt('sans', 'Medium', 30), cards.fnt('num', 'SemiBold', 42),
+                     (1.0, 0.8, 1.0), a, align='right', shadow=0.6)
     gfx.over(img, L.rgba())
     return img * smoothstep(t0, t0 + 0.6, t)
 

@@ -357,7 +357,7 @@ def render_fusion(t):
     tgt = np.array([math.cos(look) * (R0 - 0.1), -0.02, math.sin(look) * (R0 - 0.1)])
     tg = gl3d.target(samples=0)
     tg.begin((0, 0, 0, 1))
-    g = smoothstep(t0 + 0.2, t0 + 1.6, t) * (1.0 + 0.25 * smoothstep(140.6, 141.2, t))
+    g = smoothstep(t0 + 0.2, t0 + 1.6, t) * (1.0 + 0.25 * smoothstep(141.0, 141.6, t))
     _X['kfs'].render(eye=tuple(eye), fwd=tuple(tgt - eye), time=t, glow=g)
     img = tg.read()[..., :3].copy()
     return img * (1 - smoothstep(144.6, 145.0, t))
