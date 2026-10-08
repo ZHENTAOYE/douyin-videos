@@ -48,7 +48,7 @@ CARDS = [
     dict(t0=38.4, t1=46.0, style='chapter', text='02', label='制造'),
     dict(t0=38.6, t1=44.2, style='body', text='雕刻它们，需要一种在地表几乎不存在的光\n—— 波长 13.5 纳米的极紫外光'),
     dict(t0=44.4, t1=48.9, style='body', text='每秒 5 万次\n激光精准击中一颗下落的锡滴'),
-    dict(t0=49.2, t1=53.6, style='stat', pre='锡滴瞬间化为等离子体', num='约 22 万 ℃', cap='约是太阳表面温度的 40 倍', src='数据：ASML'),
+    dict(t0=49.2, t1=53.6, style='stat', x=560, pre='锡滴瞬间化为等离子体', num='约 22 万 ℃', cap='约是太阳表面温度的 40 倍', src='数据：ASML'),
     dict(t0=54.4, t1=61.4, style='body', text='光刻机里的反射镜，若放大到德国那么大\n最高的起伏也只有 0.1 毫米', src='数据：ZEISS'),
     # ---------------------------------------------------------------- 03 connect
     dict(t0=62.6, t1=70.0, style='chapter', text='03', label='连接'),

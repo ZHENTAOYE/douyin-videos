@@ -249,18 +249,19 @@ def card_layer(cards, t):
 
 def legibility_shade(img, cards, t):
     """Darken the image slightly behind lower-left body text and big centred stats."""
-    k_body, k_mid = 0.0, 0.0
+    k_body, mids = 0.0, {}
     for cd in cards:
         a_in, a_out = env(t, cd['t0'], cd['t1'])
         a = a_in * a_out
         if cd['style'] == 'body':
             k_body = max(k_body, a)
-        elif cd['style'] in ('stat', 'q', 'title'):
-            k_mid = max(k_mid, a)
+        elif cd['style'] in ('stat', 'q', 'title') and a > 0:
+            cx = int(cd.get('x', W / 2))
+            mids[cx] = max(mids.get(cx, 0.0), a)
     if k_body > 0:
         img *= 1 - 0.55 * k_body * _shade('body')[..., None]
-    if k_mid > 0:
-        img *= 1 - 0.45 * k_mid * _shade('mid')[..., None]
+    for cx, k in mids.items():
+        img *= 1 - 0.45 * k * _shade(('mid', cx))[..., None]
     return img
 
 
@@ -270,5 +271,7 @@ def _shade(kind):
     if kind == 'body':
         d = np.sqrt(((xx - 420) / 900) ** 2 + ((yy - (H - 150)) / 300) ** 2)
     else:
-        d = np.sqrt(((xx - W / 2) / 900) ** 2 + ((yy - H / 2) / 330) ** 2)
+        cx = kind[1] if isinstance(kind, tuple) else W / 2
+        wx = 900 if abs(cx - W / 2) < 10 else 620
+        d = np.sqrt(((xx - cx) / wx) ** 2 + ((yy - H / 2) / 330) ** 2)
     return np.clip(1 - d, 0, 1) ** 1.5

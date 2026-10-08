@@ -197,4 +197,5 @@ def render(t):
         k = smoothstep(14.6, 15.4, t)
         img = img * (1 - 0.55 * k)
         img = cv2.GaussianBlur(img, (0, 0), 0.1 + 6 * k) if k > 0.01 else img
+        img = img * (1 - smoothstep(18.3, 19.0, t))
     return img
